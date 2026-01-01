@@ -19,9 +19,20 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            // 这些属性定义在 gradle.properties 中
+            storeFile = file(project.findProperty("RELEASE_STORE_FILE") ?: "empty.jks")
+            storePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String?
+            keyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String?
+            keyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
