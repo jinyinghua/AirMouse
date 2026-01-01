@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    tools:context=".DebugActivity">
+
+    <TextView
+        android:id="@+id/tvDebugTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Shizuku 调试测试"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <EditText
+        android:id="@+id/etX"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:hint="X 坐标 (例如 500)"
+        android:inputType="number"
+        app:layout_constraintTop_toBottomOf="@id/tvDebugTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/etY"
+        android:layout_marginEnd="8dp" />
+
+    <EditText
+        android:id="@+id/etY"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:hint="Y 坐标 (例如 1000)"
+        android:inputType="number"
+        app:layout_constraintTop_toTopOf="@id/etX"
+        app:layout_constraintStart_toEndOf="@id/etX"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginStart="8dp" />
+
+    <Button
+        android:id="@+id/btnStartTest"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="开始 10s 倒计时测试"
+        app:layout_constraintTop_toBottomOf="@id/etX"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/btnCheckPermissions"
+        android:layout_marginEnd="8dp" />
+
+    <Button
+        android:id="@+id/btnCheckPermissions"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="检查权限状态"
+        app:layout_constraintTop_toTopOf="@id/btnStartTest"
+        app:layout_constraintStart_toEndOf="@id/btnStartTest"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginStart="8dp" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:text="等待开始..."
+        android:textSize="18sp"
+        android:textColor="#6200EE"
+        app:layout_constraintTop_toBottomOf="@id/btnStartTest"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/tvLog"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:background="#F0F0F0"
+        android:padding="8dp"
+        android:text="日志输出:"
+        android:fontFamily="monospace"
+        android:textSize="12sp"
+        app:layout_constraintTop_toBottomOf="@id/tvStatus"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
