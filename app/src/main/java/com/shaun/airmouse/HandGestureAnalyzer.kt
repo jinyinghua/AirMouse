@@ -7,6 +7,7 @@ import android.os.SystemClock
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarker
 import com.google.mediapipe.tasks.vision.handlandmarker.HandLandmarkerResult
@@ -31,6 +32,7 @@ class HandGestureAnalyzer(
     private fun setupHandLandmarker() {
         val baseOptionsBuilder = BaseOptions.builder()
             .setModelAssetPath("hand_landmarker.task")
+            .setDelegate(Delegate.GPU)
 
         val optionsBuilder = HandLandmarker.HandLandmarkerOptions.builder()
             .setBaseOptions(baseOptionsBuilder.build())

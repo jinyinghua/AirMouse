@@ -11,9 +11,9 @@ import androidx.core.content.ContextCompat
 class PointerOverlay(private val context: Context) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val pointerView: View = View(context).apply {
-        // 设置背景为一个半透明的小圆点
+        // 设置背景为一个半透明的小圆点，初始透明度较低
         background = ContextCompat.getDrawable(context, R.drawable.pointer_shape)
-        alpha = 0.6f
+        alpha = 0.3f // 初始透明度较低
     }
 
     private val params = WindowManager.LayoutParams(
@@ -52,6 +52,12 @@ class PointerOverlay(private val context: Context) {
             params.x = x - 20 // 居中
             params.y = y - 20 // 居中
             windowManager.updateViewLayout(pointerView, params)
+        }
+    }
+
+    fun setAlpha(alpha: Float) {
+        if (isShowing) {
+            pointerView.alpha = alpha
         }
     }
 }

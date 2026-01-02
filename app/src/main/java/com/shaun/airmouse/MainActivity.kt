@@ -151,7 +151,7 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
         if (checkShizukuPermission(0)) {
             val intent = Intent(this, AirMouseService::class.java)
             ContextCompat.startForegroundService(this, intent)
-            Toast.makeText(this, "服务已启动", Toast.LENGTH_SHORT).show()
+            // 移除过早的 Toast 提示，改为在服务真正就绪后提示
         }
     }
 
