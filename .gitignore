@@ -15,4 +15,4 @@
 local.properties
 gradle.properties
 /.idea/MarsCodeWorkspaceAppSettings.xml
-/app/build
+/app/build/
