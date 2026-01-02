@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">AirMouse</string>
+    <string name="sensitivity_label">灵敏度: %.1f</string>
 </resources>

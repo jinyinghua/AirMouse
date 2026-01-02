@@ -25,6 +25,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import rikka.shizuku.Shizuku
 import java.util.concurrent.ExecutorService
+import com.shaun.airmouse.MainActivity.Companion.DEFAULT_SENSITIVITY
+import com.shaun.airmouse.MainActivity.Companion.KEY_SENSITIVITY
+import com.shaun.airmouse.MainActivity.Companion.PREFS_NAME
 import java.util.concurrent.Executors
 import kotlin.math.abs
 
@@ -68,6 +71,9 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
     private var basePointerY = 0f // 手势开始时指针的起始基准坐标
     private var lastHandDetectedTime = 0L // 上次检测到手的时间
     private val handLossTimeout = 500L // 手势丢失超时时间 (ms)
+    
+    // 灵敏度乘数
+    private var sensitivityMultiplier = DEFAULT_SENSITIVITY
 
     override fun onCreate() {
         super.onCreate()
@@ -79,6 +85,14 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
         // 初始化指针位置为屏幕中央
         currentPointerX = screenWidth / 2f
         currentPointerY = screenHeight / 2f
+        
+        loadSensitivity()
+    }
+
+    private fun loadSensitivity() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        sensitivityMultiplier = prefs.getFloat(KEY_SENSITIVITY, DEFAULT_SENSITIVITY)
+        Log.d("AirMouseService", "Loaded sensitivity: $sensitivityMultiplier")
     }
 
     private fun updateScreenMetrics() {
@@ -215,9 +229,9 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
             isFirstGesture = false
             Log.d("AirMouseService", "Gesture anchor set. Hand: ($targetX, $targetY), Pointer: ($basePointerX, $basePointerY)")
         } else {
-            // 计算手势相对于初始位置的位移
-            val gestureDeltaX = targetX - initialGestureX
-            val gestureDeltaY = targetY - initialGestureY
+            // 计算手势相对于初始位置的位移 (应用灵敏度乘数)
+            val gestureDeltaX = (targetX - initialGestureX) * sensitivityMultiplier
+            val gestureDeltaY = (targetY - initialGestureY) * sensitivityMultiplier
             
             // 计算手势移动距离
             val gestureMoveDistance = sqrt(gestureDeltaX.pow(2) + gestureDeltaY.pow(2))

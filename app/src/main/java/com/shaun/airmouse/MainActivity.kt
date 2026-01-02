@@ -16,12 +16,23 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import android.widget.SeekBar
+import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import rikka.shizuku.Shizuku
 import rikka.sui.Sui
 
 class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListener {
+
+    companion object {
+        const val PREFS_NAME = "AirMousePrefs"
+        const val KEY_SENSITIVITY = "sensitivity"
+        const val DEFAULT_SENSITIVITY = 1.0f
+        const val SENSITIVITY_MIN = 0.5f
+        const val SENSITIVITY_MAX = 3.0f
+        const val SENSITIVITY_STEP = 0.1f
+    }
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
@@ -46,6 +57,8 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+        
+        setupSensitivityControl()
 
         findViewById<Button>(R.id.btnStartService).setOnClickListener {
             startAirMouseService()
@@ -65,6 +78,36 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
         
         // 注册Shizuku权限监听器
         Shizuku.addRequestPermissionResultListener(this)
+    }
+    
+    private fun setupSensitivityControl() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val tvSensitivity = findViewById<TextView>(R.id.tvSensitivity)
+        val sbSensitivity = findViewById<SeekBar>(R.id.sbSensitivity)
+
+        // SeekBar max is 25 (0.5 to 3.0, step 0.1 -> 25 steps)
+        val maxProgress = ((SENSITIVITY_MAX - SENSITIVITY_MIN) / SENSITIVITY_STEP).toInt()
+        sbSensitivity.max = maxProgress
+
+        // 加载保存的灵敏度值
+        val savedSensitivity = prefs.getFloat(KEY_SENSITIVITY, DEFAULT_SENSITIVITY)
+        val initialProgress = ((savedSensitivity - SENSITIVITY_MIN) / SENSITIVITY_STEP).toInt()
+        sbSensitivity.progress = initialProgress
+        tvSensitivity.text = getString(R.string.sensitivity_label, savedSensitivity)
+
+        sbSensitivity.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                // 计算灵敏度值: 0.5 + progress * 0.1
+                val sensitivity = SENSITIVITY_MIN + progress * SENSITIVITY_STEP
+                tvSensitivity.text = getString(R.string.sensitivity_label, sensitivity)
+
+                // 保存新值
+                prefs.edit().putFloat(KEY_SENSITIVITY, sensitivity).apply()
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
     }
 
     private fun createNotificationChannel() {
