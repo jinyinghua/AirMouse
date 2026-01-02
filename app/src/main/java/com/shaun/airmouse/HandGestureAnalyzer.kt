@@ -22,6 +22,7 @@ class HandGestureAnalyzer(
 
     interface GestureListener {
         fun onGestureUpdate(x: Float, y: Float, isPinching: Boolean, distance: Float)
+        fun onHandLost()
         fun onError(error: String)
     }
 
@@ -80,6 +81,8 @@ class HandGestureAnalyzer(
             val isPinching = distance < pinchThreshold
 
             listener.onGestureUpdate(anchorX, anchorY, isPinching, distance)
+        } else {
+            listener.onHandLost()
         }
     }
 

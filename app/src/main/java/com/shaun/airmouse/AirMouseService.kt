@@ -62,6 +62,12 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
     private var initialGestureY = 0f // 初始手势Y坐标
     private var currentPointerX = 0f // 当前指针X坐标
     private var currentPointerY = 0f // 当前指针Y坐标
+    
+    // 修复跳动所需的新变量
+    private var basePointerX = 0f // 手势开始时指针的起始基准坐标
+    private var basePointerY = 0f // 手势开始时指针的起始基准坐标
+    private var lastHandDetectedTime = 0L // 上次检测到手的时间
+    private val handLossTimeout = 500L // 手势丢失超时时间 (ms)
 
     override fun onCreate() {
         super.onCreate()
@@ -178,8 +184,13 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
     }
 
     override fun onGestureUpdate(x: Float, y: Float, isPinching: Boolean, distance: Float) {
-        // 激活指针（第一次检测到手势时调高透明度）
-        if (!isPointerActivated) {
+        val currentTime = SystemClock.uptimeMillis()
+        
+        // 更新上次检测到手的时间
+        lastHandDetectedTime = currentTime
+
+        // 激活指针（检测到手势时调高透明度）
+        if (!isPointerActivated || isFirstGesture) {
             isPointerActivated = true
             Handler(Looper.getMainLooper()).post {
                 pointerOverlay.setAlpha(0.8f) // 调高透明度表示已激活
@@ -193,13 +204,16 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
 
         // 防抖逻辑改进
         if (isFirstGesture) {
-            // 第一次识别到手势，记录初始位置，但指针不动
+            // 第一次识别到手势（或手势丢失后重新识别），记录初始基准
             initialGestureX = targetX
             initialGestureY = targetY
+            basePointerX = currentPointerX // 记录当前指针位置作为移动基准
+            basePointerY = currentPointerY
+            
             lastX = targetX
             lastY = targetY
             isFirstGesture = false
-            Log.d("AirMouseService", "First gesture detected at ($targetX, $targetY), pointer remains at center")
+            Log.d("AirMouseService", "Gesture anchor set. Hand: ($targetX, $targetY), Pointer: ($basePointerX, $basePointerY)")
         } else {
             // 计算手势相对于初始位置的位移
             val gestureDeltaX = targetX - initialGestureX
@@ -210,9 +224,9 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
             
             if (gestureMoveDistance > deadzoneThreshold) {
                 // 手势移动超过阈值，开始跟随移动
-                // 计算指针应该移动到的位置（屏幕中央 + 手势位移）
-                val newPointerX = (screenWidth / 2f) + gestureDeltaX
-                val newPointerY = (screenHeight / 2f) + gestureDeltaY
+                // 计算指针应该移动到的位置（起始基准位置 + 手势位移）
+                val newPointerX = basePointerX + gestureDeltaX
+                val newPointerY = basePointerY + gestureDeltaY
                 
                 // 确保指针在屏幕范围内
                 val clampedX = newPointerX.coerceIn(0f, screenWidth.toFloat())
@@ -375,6 +389,23 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
                 }
             } catch (e: Exception) {
                 Log.e("AirMouseService", "Perform swipe failed", e)
+            }
+        }
+    }
+
+    override fun onHandLost() {
+        // 无论手势丢失多久，都将 isFirstGesture 设为 true，确保下次识别到手时重置锚点，防止跳动
+        isFirstGesture = true
+        
+        val currentTime = SystemClock.uptimeMillis()
+        // 如果手势丢失超过超时时间，标记为非激活状态，并降低指针透明度
+        if (currentTime - lastHandDetectedTime > handLossTimeout) {
+            if (isPointerActivated) {
+                isPointerActivated = false
+                Handler(Looper.getMainLooper()).post {
+                    pointerOverlay.setAlpha(0.3f) // 降低透明度表示失去追踪
+                }
+                Log.d("AirMouseService", "Hand lost timeout triggered, deactivating pointer")
             }
         }
     }
