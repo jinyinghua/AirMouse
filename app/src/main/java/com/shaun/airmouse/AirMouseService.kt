@@ -51,6 +51,11 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
     private val deadzoneThreshold = 30f // 像素，提高阈值减少误触
     private val swipeThreshold = 60f // 提高阈值，减少误触
     private val clickOffset = 15 // 像素，用于修正点击偏上的问题
+    
+    // EMA 平滑变量
+    private val emaAlpha = 0.5f // EMA平滑因子，值越小越平滑/延迟越大
+    private var smoothedHandX = 0f // EMA平滑后的手势X坐标
+    private var smoothedHandY = 0f // EMA平滑后的手势Y坐标
 
     // 频率控制
     private var lastAnalysisTime = 0L
@@ -216,22 +221,31 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
         val targetX = (1 - y) * screenWidth
         val targetY = (1 - x) * screenHeight
 
-        // 防抖逻辑改进
+        // 1. 应用 EMA 平滑原始手势坐标
+        if (isFirstGesture) {
+            smoothedHandX = targetX
+            smoothedHandY = targetY
+        } else {
+            smoothedHandX = emaAlpha * targetX + (1 - emaAlpha) * smoothedHandX
+            smoothedHandY = emaAlpha * targetY + (1 - emaAlpha) * smoothedHandY
+        }
+
+        // 2. 防抖逻辑（使用平滑后的坐标）
         if (isFirstGesture) {
             // 第一次识别到手势（或手势丢失后重新识别），记录初始基准
-            initialGestureX = targetX
-            initialGestureY = targetY
+            initialGestureX = smoothedHandX // 使用平滑后的坐标作为初始锚点
+            initialGestureY = smoothedHandY
             basePointerX = currentPointerX // 记录当前指针位置作为移动基准
             basePointerY = currentPointerY
             
-            lastX = targetX
-            lastY = targetY
+            lastX = smoothedHandX // 使用平滑后的坐标用于点击逻辑
+            lastY = smoothedHandY
             isFirstGesture = false
-            Log.d("AirMouseService", "Gesture anchor set. Hand: ($targetX, $targetY), Pointer: ($basePointerX, $basePointerY)")
+            Log.d("AirMouseService", "Gesture anchor set. Smoothed Hand: ($initialGestureX, $initialGestureY), Pointer: ($basePointerX, $basePointerY)")
         } else {
             // 计算手势相对于初始位置的位移 (应用灵敏度乘数)
-            val gestureDeltaX = (targetX - initialGestureX) * sensitivityMultiplier
-            val gestureDeltaY = (targetY - initialGestureY) * sensitivityMultiplier
+            val gestureDeltaX = (smoothedHandX - initialGestureX) * sensitivityMultiplier
+            val gestureDeltaY = (smoothedHandY - initialGestureY) * sensitivityMultiplier
             
             // 计算手势移动距离
             val gestureMoveDistance = sqrt(gestureDeltaX.pow(2) + gestureDeltaY.pow(2))
@@ -260,13 +274,13 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
                 }
                 
                 // 更新lastX/lastY用于点击逻辑
-                lastX = targetX
-                lastY = targetY
+                lastX = smoothedHandX
+                lastY = smoothedHandY
             } else {
                 // 手势移动未超过阈值，指针保持当前位置
                 // 但更新lastX/lastY用于点击逻辑
-                lastX = targetX
-                lastY = targetY
+                lastX = smoothedHandX
+                lastY = smoothedHandY
             }
         }
 
