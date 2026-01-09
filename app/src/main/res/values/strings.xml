@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">AirMouse</string>
     <string name="sensitivity_label">灵敏度: %.1f</string>
+    <string name="accessibility_service_description">AirMouse 无障碍服务用于执行点击和滑动操作，以实现隔空手势控制。</string>
 </resources>

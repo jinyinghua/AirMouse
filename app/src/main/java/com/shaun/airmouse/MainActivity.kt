@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
+import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,6 +60,7 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
         }
         
         setupSensitivityControl()
+        setupModeSelection()
 
         findViewById<Button>(R.id.btnStartService).setOnClickListener {
             startAirMouseService()
@@ -109,6 +111,29 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
     }
+    
+    private fun setupModeSelection() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val rgMode = findViewById<RadioGroup>(R.id.rgMode)
+        val currentMode = prefs.getString("input_mode", "shizuku")
+        
+        if (currentMode == "accessibility") {
+            rgMode.check(R.id.rbAccessibility)
+        } else {
+            rgMode.check(R.id.rbShizuku)
+        }
+        
+        rgMode.setOnCheckedChangeListener { _, checkedId ->
+            val mode = if (checkedId == R.id.rbAccessibility) "accessibility" else "shizuku"
+            prefs.edit().putString("input_mode", mode).apply()
+            
+            if (mode == "accessibility") {
+                checkAccessibilityPermission()
+            } else {
+                checkShizukuPermission()
+            }
+        }
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -148,7 +173,13 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
             )
             startActivity(intent)
         } else {
-            checkShizukuPermission()
+            // Check based on current mode
+            val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (prefs.getString("input_mode", "shizuku") == "shizuku") {
+                checkShizukuPermission()
+            } else {
+                checkAccessibilityPermission()
+            }
         }
     }
 
@@ -172,6 +203,39 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
             return false
         }
     }
+    
+    private fun checkAccessibilityPermission(): Boolean {
+        val expectedServiceName = "$packageName/${AirMouseAccessibilityService::class.java.canonicalName}"
+        val expectedServiceNameShort = "$packageName/.AirMouseAccessibilityService"
+        
+        val accessibilityEnabled = Settings.Secure.getInt(
+            contentResolver,
+            Settings.Secure.ACCESSIBILITY_ENABLED, 0
+        )
+        
+        if (accessibilityEnabled == 1) {
+            val settingValue = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            )
+            if (settingValue != null) {
+                val splitter = android.text.TextUtils.SimpleStringSplitter(':')
+                splitter.setString(settingValue)
+                while (splitter.hasNext()) {
+                    val accessibilityService = splitter.next()
+                    if (accessibilityService.equals(expectedServiceName, ignoreCase = true) ||
+                        accessibilityService.equals(expectedServiceNameShort, ignoreCase = true)) {
+                        return true
+                    }
+                }
+            }
+        }
+        
+        Toast.makeText(this, "请开启 AirMouse 无障碍服务", Toast.LENGTH_LONG).show()
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        startActivity(intent)
+        return false
+    }
 
     private fun startAirMouseService() {
         if (!Settings.canDrawOverlays(this)) {
@@ -186,16 +250,25 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
             return
         }
         
-        if (!Shizuku.pingBinder()) {
-            Toast.makeText(this, "请先启动 Shizuku 应用", Toast.LENGTH_LONG).show()
-            return
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val mode = prefs.getString("input_mode", "shizuku")
+        
+        if (mode == "shizuku") {
+            if (!Shizuku.pingBinder()) {
+                Toast.makeText(this, "请先启动 Shizuku 应用", Toast.LENGTH_LONG).show()
+                return
+            }
+            if (!checkShizukuPermission(0)) {
+                return
+            }
+        } else {
+            if (!checkAccessibilityPermission()) {
+                return
+            }
         }
         
-        if (checkShizukuPermission(0)) {
-            val intent = Intent(this, AirMouseService::class.java)
-            ContextCompat.startForegroundService(this, intent)
-            // 移除过早的 Toast 提示，改为在服务真正就绪后提示
-        }
+        val intent = Intent(this, AirMouseService::class.java)
+        ContextCompat.startForegroundService(this, intent)
     }
 
     private fun stopAirMouseService() {
@@ -216,10 +289,21 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
     }
 
     private fun checkAndStartServiceIfReady() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val mode = prefs.getString("input_mode", "shizuku")
+        
+        val isModeReady = if (mode == "shizuku") {
+            try {
+                Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
+            } catch (e: Exception) { false }
+        } else {
+            // 这里简化判断，因为无障碍权限通常需要跳转设置页
+            false 
+        }
+
         if (Settings.canDrawOverlays(this) && 
             ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
-            Shizuku.pingBinder() &&
-            Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+            isModeReady) {
             
             val intent = Intent(this, AirMouseService::class.java)
             ContextCompat.startForegroundService(this, intent)

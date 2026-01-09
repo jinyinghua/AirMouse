@@ -36,6 +36,7 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var pointerOverlay: PointerOverlay
     private lateinit var gestureAnalyzer: HandGestureAnalyzer
+    private lateinit var inputController: InputController
     private val CHANNEL_ID = "AirMouseServiceChannel"
 
     private var screenWidth = 0
@@ -92,12 +93,26 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
         currentPointerY = screenHeight / 2f
         
         loadSensitivity()
+        setupInputController()
     }
 
     private fun loadSensitivity() {
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         sensitivityMultiplier = prefs.getFloat(KEY_SENSITIVITY, DEFAULT_SENSITIVITY)
         Log.d("AirMouseService", "Loaded sensitivity: $sensitivityMultiplier")
+    }
+    
+    private fun setupInputController() {
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val mode = prefs.getString("input_mode", "shizuku")
+        
+        inputController = if (mode == "accessibility") {
+            AccessibilityInputController()
+        } else {
+            ShizukuInputController()
+        }
+        
+        Log.d("AirMouseService", "Input controller initialized: $mode")
     }
 
     private fun updateScreenMetrics() {
@@ -318,103 +333,44 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
     }
 
     private fun performClick(x: Int, y: Int) {
-        if (!Shizuku.pingBinder()) {
-            Log.e("AirMouseService", "Shizuku is not running")
+        if (!inputController.isReady()) {
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this@AirMouseService, "Shizuku未运行，请检查", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
-        
-        if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            Log.e("AirMouseService", "Shizuku permission not granted")
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this@AirMouseService, "Shizuku权限被拒绝", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@AirMouseService, "输入服务未就绪，请检查权限或服务开启状态", Toast.LENGTH_SHORT).show()
             }
             return
         }
         
         cameraExecutor.execute {
             try {
-                Log.d("AirMouseService", "Executing: input tap $x $y")
-                val process = Shizuku.newProcess(arrayOf("input", "tap", x.toString(), y.toString()), null, null)
-                val result = process.waitFor()
-                Log.d("AirMouseService", "Click command result: $result")
-                if (result != 0) {
-                    Log.e("AirMouseService", "Click command failed with exit code $result")
-                    Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(this@AirMouseService, "点击执行失败", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                inputController.click(x.toFloat(), y.toFloat())
             } catch (e: Exception) {
                 Log.e("AirMouseService", "Perform click failed", e)
-                Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(this@AirMouseService, "点击执行异常: ${e.message}", Toast.LENGTH_LONG).show()
-                }
             }
         }
     }
 
     private fun performLongPress(x: Int, y: Int) {
-        if (!Shizuku.pingBinder()) {
-            Log.e("AirMouseService", "Shizuku is not running for long press")
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this@AirMouseService, "Shizuku未运行，无法执行长按", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
-        
-        if (Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            Log.e("AirMouseService", "Shizuku permission not granted for long press")
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this@AirMouseService, "Shizuku权限被拒绝，无法执行长按", Toast.LENGTH_LONG).show()
-            }
+        if (!inputController.isReady()) {
             return
         }
         
         cameraExecutor.execute {
             try {
-                Log.d("AirMouseService", "Performing long press at $x, $y")
-                // 模拟长按：在同一点滑动，持续时间较长
-                val process = Shizuku.newProcess(
-                    arrayOf("input", "swipe", x.toString(), y.toString(), x.toString(), y.toString(), "1000"),
-                    null,
-                    null
-                )
-                val result = process.waitFor()
-                if (result != 0) {
-                    Log.e("AirMouseService", "Long press command failed with exit code $result")
-                    Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(this@AirMouseService, "长按执行失败", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                inputController.longPress(x.toFloat(), y.toFloat())
             } catch (e: Exception) {
                 Log.e("AirMouseService", "Perform long press failed", e)
-                Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(this@AirMouseService, "长按执行异常: ${e.message}", Toast.LENGTH_LONG).show()
-                }
             }
         }
     }
 
     private fun performSwipe(x1: Int, y1: Int, x2: Int, y2: Int) {
-        if (!Shizuku.pingBinder()) {
-            Log.e("AirMouseService", "Shizuku is not running for swipe")
+        if (!inputController.isReady()) {
             return
         }
         
         cameraExecutor.execute {
             try {
-                Log.d("AirMouseService", "Executing swipe: $x1 $y1 to $x2 $y2")
-                val process = Shizuku.newProcess(
-                    arrayOf("input", "swipe", x1.toString(), y1.toString(), x2.toString(), y2.toString(), "300"),
-                    null,
-                    null
-                )
-                val result = process.waitFor()
-                if (result != 0) {
-                    Log.e("AirMouseService", "Swipe command failed")
-                }
+                inputController.swipe(x1.toFloat(), y1.toFloat(), x2.toFloat(), y2.toFloat(), 300)
             } catch (e: Exception) {
                 Log.e("AirMouseService", "Perform swipe failed", e)
             }
