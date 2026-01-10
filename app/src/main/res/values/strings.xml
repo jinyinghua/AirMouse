@@ -2,4 +2,23 @@
     <string name="app_name">AirMouse</string>
     <string name="sensitivity_label">灵敏度: %.1f</string>
     <string name="accessibility_service_description">AirMouse 无障碍服务用于执行点击和滑动操作，以实现隔空手势控制。</string>
+
+    <!-- UI Strings -->
+    <string name="status_title">服务状态</string>
+    <string name="status_running">正在运行</string>
+    <string name="status_stopped">未运行</string>
+    <string name="action_start">启动服务</string>
+    <string name="action_stop">停止服务</string>
+
+    <string name="mode_title">工作模式</string>
+    <string name="mode_shizuku">Shizuku 模式 (推荐)</string>
+    <string name="mode_accessibility">无障碍模式</string>
+    <string name="desc_shizuku">通过 Shizuku 执行系统级指令。性能更高，无延迟，需要 Shizuku 应用支持。</string>
+    <string name="desc_accessibility">使用安卓标准无障碍服务。设置简单，但可能存在轻微操作延迟。</string>
+    <string name="action_authorize_shizuku">授权 Shizuku</string>
+    <string name="action_open_accessibility">打开无障碍设置</string>
+
+    <string name="settings_title">设置</string>
+    <string name="debug_title">调试</string>
+    <string name="action_debug">打开调试界面</string>
 </resources>

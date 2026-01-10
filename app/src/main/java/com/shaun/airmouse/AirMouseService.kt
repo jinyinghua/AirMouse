@@ -23,6 +23,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import rikka.shizuku.Shizuku
 import java.util.concurrent.ExecutorService
 import com.shaun.airmouse.MainActivity.Companion.DEFAULT_SENSITIVITY
@@ -152,6 +153,9 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
         }
         
         startCamera()
+        
+        // 发送服务运行状态广播
+        sendServiceStatus(true)
 
         return START_STICKY
     }
@@ -410,5 +414,14 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
         // 重置状态
         isFirstGesture = true
         isPointerActivated = false
+        
+        // 发送服务停止状态广播
+        sendServiceStatus(false)
+    }
+
+    private fun sendServiceStatus(isRunning: Boolean) {
+        val intent = Intent("com.shaun.airmouse.SERVICE_STATUS")
+        intent.putExtra("isRunning", isRunning)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 }

@@ -19,10 +19,15 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import android.widget.SeekBar
 import android.widget.TextView
+import android.view.View
+import android.content.res.ColorStateList
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import rikka.shizuku.Shizuku
 import rikka.sui.Sui
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 
 class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListener {
 
@@ -44,6 +49,17 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
             }
         }
     private var shizukuPermissionGranted = false
+    private var isServiceRunning = false
+
+    // 接收服务状态广播
+    private val serviceStatusReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.shaun.airmouse.SERVICE_STATUS") {
+                isServiceRunning = intent.getBooleanExtra("isRunning", false)
+                updateStatusCard()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,14 +77,8 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
         
         setupSensitivityControl()
         setupModeSelection()
-
-        findViewById<Button>(R.id.btnStartService).setOnClickListener {
-            startAirMouseService()
-        }
-
-        findViewById<Button>(R.id.btnStopService).setOnClickListener {
-            stopAirMouseService()
-        }
+        setupServiceControl()
+        updateStatusCard()
 
         findViewById<Button>(R.id.btnOpenDebug).setOnClickListener {
             val intent = Intent(this, DebugActivity::class.java)
@@ -80,6 +90,12 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
         
         // 注册Shizuku权限监听器
         Shizuku.addRequestPermissionResultListener(this)
+        
+        // 注册服务状态广播接收器
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+            serviceStatusReceiver,
+            IntentFilter("com.shaun.airmouse.SERVICE_STATUS")
+        )
     }
     
     private fun setupSensitivityControl() {
@@ -123,15 +139,63 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
             rgMode.check(R.id.rbShizuku)
         }
         
+        updateModeDescription(currentMode ?: "shizuku")
+        
         rgMode.setOnCheckedChangeListener { _, checkedId ->
             val mode = if (checkedId == R.id.rbAccessibility) "accessibility" else "shizuku"
             prefs.edit().putString("input_mode", mode).apply()
-            
+            updateModeDescription(mode)
+        }
+
+        findViewById<Button>(R.id.btnModeAction).setOnClickListener {
+            val mode = prefs.getString("input_mode", "shizuku")
             if (mode == "accessibility") {
-                checkAccessibilityPermission()
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                startActivity(intent)
             } else {
                 checkShizukuPermission()
             }
+        }
+    }
+
+    private fun updateModeDescription(mode: String) {
+        val tvDescription = findViewById<TextView>(R.id.tvModeDescription)
+        val btnAction = findViewById<Button>(R.id.btnModeAction)
+        
+        if (mode == "shizuku") {
+            tvDescription.text = getString(R.string.desc_shizuku)
+            btnAction.text = getString(R.string.action_authorize_shizuku)
+            // 检查 Shizuku 权限并更新按钮状态（可选，这里保持总是可点击去请求权限）
+        } else {
+            tvDescription.text = getString(R.string.desc_accessibility)
+            btnAction.text = getString(R.string.action_open_accessibility)
+        }
+    }
+
+    private fun setupServiceControl() {
+        val btnToggle = findViewById<Button>(R.id.btnToggleService)
+        btnToggle.setOnClickListener {
+            if (isServiceRunning) {
+                stopAirMouseService()
+            } else {
+                startAirMouseService()
+            }
+        }
+    }
+
+    private fun updateStatusCard() {
+        val statusIndicator = findViewById<View>(R.id.statusIndicator)
+        val tvStatus = findViewById<TextView>(R.id.tvStatus)
+        val btnToggle = findViewById<Button>(R.id.btnToggleService)
+        
+        if (isServiceRunning) {
+            statusIndicator.backgroundTintList = ColorStateList.valueOf(getColor(R.color.purple_500)) // 使用主题色或定义好的颜色
+            tvStatus.text = getString(R.string.status_running)
+            btnToggle.text = getString(R.string.action_stop)
+        } else {
+            statusIndicator.backgroundTintList = ColorStateList.valueOf(getColor(android.R.color.darker_gray))
+            tvStatus.text = getString(R.string.status_stopped)
+            btnToggle.text = getString(R.string.action_start)
         }
     }
 
@@ -254,11 +318,16 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
         val mode = prefs.getString("input_mode", "shizuku")
         
         if (mode == "shizuku") {
-            if (!Shizuku.pingBinder()) {
-                Toast.makeText(this, "请先启动 Shizuku 应用", Toast.LENGTH_LONG).show()
-                return
-            }
-            if (!checkShizukuPermission(0)) {
+            try {
+                if (!Shizuku.pingBinder()) {
+                    Toast.makeText(this, "请先启动 Shizuku 应用", Toast.LENGTH_LONG).show()
+                    return
+                }
+                if (!checkShizukuPermission(0)) {
+                    return
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this, "Shizuku 服务未运行", Toast.LENGTH_LONG).show()
                 return
             }
         } else {
@@ -269,12 +338,17 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
         
         val intent = Intent(this, AirMouseService::class.java)
         ContextCompat.startForegroundService(this, intent)
+        // 乐观更新状态，实际状态由 Service 广播确认
+        isServiceRunning = true
+        updateStatusCard()
     }
 
     private fun stopAirMouseService() {
         val intent = Intent(this, AirMouseService::class.java)
         stopService(intent)
         Toast.makeText(this, "服务已停止", Toast.LENGTH_SHORT).show()
+        isServiceRunning = false
+        updateStatusCard()
     }
 
     override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
@@ -315,5 +389,7 @@ class MainActivity : AppCompatActivity(), Shizuku.OnRequestPermissionResultListe
         super.onDestroy()
         // 移除Shizuku权限监听器
         Shizuku.removeRequestPermissionResultListener(this)
+        // 移除广播接收器
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(serviceStatusReceiver)
     }
 }

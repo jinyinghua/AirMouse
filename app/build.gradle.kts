@@ -13,8 +13,8 @@ android {
         applicationId = "com.shaun.airmouse"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.4"
+        versionCode = 4
+        versionName = "1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -68,6 +68,7 @@ dependencies {
     // Shizuku
     implementation(libs.shizuku.api)
     implementation(libs.shizuku.provider)
+    implementation(libs.androidx.localbroadcastmanager)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
