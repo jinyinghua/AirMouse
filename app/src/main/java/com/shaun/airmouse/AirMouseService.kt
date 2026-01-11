@@ -53,11 +53,10 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
     private val deadzoneThreshold = 30f // 像素，提高阈值减少误触
     private val swipeThreshold = 60f // 提高阈值，减少误触
     private val clickOffset = 15 // 像素，用于修正点击偏上的问题
-    
-    // EMA 平滑变量
-    private val emaAlpha = 0.5f // EMA平滑因子，值越小越平滑/延迟越大
-    private var smoothedHandX = 0f // EMA平滑后的手势X坐标
-    private var smoothedHandY = 0f // EMA平滑后的手势Y坐标
+
+    // 1 Euro Filter 实例
+    private lateinit var xFilter: OneEuroFilter
+    private lateinit var yFilter: OneEuroFilter
 
     // 频率控制
     private var lastAnalysisTime = 0L
@@ -88,7 +87,11 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
         cameraExecutor = Executors.newSingleThreadExecutor()
         gestureAnalyzer = HandGestureAnalyzer(this, this)
         updateScreenMetrics()
-        
+
+        // 初始化 1 Euro Filter
+        xFilter = OneEuroFilter(minCutoff = 1.0f, beta = 0.5f, dCutoff = 1.0f)
+        yFilter = OneEuroFilter(minCutoff = 1.0f, beta = 0.5f, dCutoff = 1.0f)
+
         // 初始化指针位置为屏幕中央
         currentPointerX = screenWidth / 2f
         currentPointerY = screenHeight / 2f
@@ -240,14 +243,9 @@ class AirMouseService : LifecycleService(), HandGestureAnalyzer.GestureListener 
         val targetX = (1 - y) * screenWidth
         val targetY = (1 - x) * screenHeight
 
-        // 1. 应用 EMA 平滑原始手势坐标
-        if (isFirstGesture) {
-            smoothedHandX = targetX
-            smoothedHandY = targetY
-        } else {
-            smoothedHandX = emaAlpha * targetX + (1 - emaAlpha) * smoothedHandX
-            smoothedHandY = emaAlpha * targetY + (1 - emaAlpha) * smoothedHandY
-        }
+        // 1. 应用 1 Euro Filter 平滑原始手势坐标
+        val smoothedHandX = xFilter.filter(targetX, currentTime)
+        val smoothedHandY = yFilter.filter(targetY, currentTime)
 
         // 2. 防抖逻辑（使用平滑后的坐标）
         if (isFirstGesture) {
